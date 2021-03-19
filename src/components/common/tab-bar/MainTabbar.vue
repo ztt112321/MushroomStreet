@@ -1,5 +1,5 @@
 <template>
-  <div>
+  <div class="tab-bar">
     <Tabbar>
       <TabbarItem path="/home" activeColor="blue">
         <div class="fa fa-home" slot="tab-icon"></div>

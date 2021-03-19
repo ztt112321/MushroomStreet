@@ -1,64 +1,22 @@
 <template>
-  <div>
+  <div id="home">
     <Navbar class="nav-bar">
       <div slot="center">蘑菇街</div>
     </Navbar>
-    <HomeSwiper :banners="banners"></HomeSwiper>
-    <home-recommend :recommend="recommend" />
-    <HomePopular />
-    <TabControl :titles="['流行','新款','精选']" class="tab-control"></TabControl>
-    <ul>
-      <li>占位列表1</li>
-      <li>占位列表2</li>
-      <li>占位列表3</li>
-      <li>占位列表4</li>
-      <li>占位列表5</li>
-      <li>占位列表6</li>
-      <li>占位列表7</li>
-      <li>占位列表8</li>
-      <li>占位列表9</li>
-      <li>占位列表10</li>
-      <li>占位列表11</li>
-      <li>占位列表12</li>
-      <li>占位列表13</li>
-      <li>占位列表14</li>
-      <li>占位列表15</li>
-      <li>占位列表16</li>
-      <li>占位列表17</li>
-      <li>占位列表18</li>
-      <li>占位列表19</li>
-      <li>占位列表20</li>
-      <li>占位列表21</li>
-      <li>占位列表22</li>
-      <li>占位列表23</li>
-      <li>占位列表24</li>
-      <li>占位列表25</li>
-      <li>占位列表26</li>
-      <li>占位列表27</li>
-      <li>占位列表28</li>
-      <li>占位列表29</li>
-      <li>占位列表30</li>
-      <li>占位列表31</li>
-      <li>占位列表32</li>
-      <li>占位列表33</li>
-      <li>占位列表34</li>
-      <li>占位列表35</li>
-      <li>占位列表36</li>
-      <li>占位列表37</li>
-      <li>占位列表38</li>
-      <li>占位列表39</li>
-      <li>占位列表40</li>
-      <li>占位列表41</li>
-      <li>占位列表42</li>
-      <li>占位列表43</li>
-      <li>占位列表44</li>
-      <li>占位列表45</li>
-      <li>占位列表46</li>
-      <li>占位列表47</li>
-      <li>占位列表48</li>
-      <li>占位列表49</li>
-      <li>占位列表50</li>
-    </ul>
+    <TabControl :titles="['流行','新款','精选']" class="tab-control" @tabclick="tabClick"
+                v-show="isTabFixed" ref="tabFixed">
+    </TabControl>
+    <BetterScroll :click="true" :pullupload="true" :probetype="3" class="better-scroll1"
+                  ref="scroll"
+                  @bsscroll="homeScroll" @pullingup="loadMore">
+      <HomeSwiper :banners="banners"></HomeSwiper>
+      <home-recommend :recommend="recommend" />
+      <HomePopular />
+      <TabControl :titles="['流行','新款','精选']" class="tab-control" @tabclick="tabClick"
+                  v-show="!isTabFixed" ref="tabContent"></TabControl>
+      <GoodsList :goods="goods[currentType].list" @imageload="imageLoad"></GoodsList>
+    </BetterScroll>
+    <BackTop v-show="isShowTop" @click.native="backTop"></BackTop>
   </div>
 </template>
 
@@ -66,20 +24,30 @@
   //公共组件
   import Navbar from '../../components/common/nav-bar/Navbar'
   import TabControl from '../../components/content/tabControl/TabControl'
-
+  import GoodsList from '../../components/content/goods/GoodsList'
+  import BetterScroll from '../../components/common/better-scroll/BetterScroll'
+  import {backTopMixin} from "../../commont/mixin";
 
   //home的子组件
   import HomeSwiper from './children-components/HomeSwiper'
-  import {getHomeMultidata} from "../../network/home";
+  import {getHomeMultidata,getHomeGoods} from "../../network/home";
   import HomeRecommend from './children-components/HomeRecommend'
   import HomePopular from './children-components/HomePopular'
 
   export default {
     name: "Home",
+    mixins:[backTopMixin],
     data(){
       return {
-        banners:[],
-        recommend:[]
+        banners:[], //轮播图数据
+        recommend:[], //推荐数据
+        goods:{ //详细列表展示数据
+          pop:{page:0,list:[]}, //流行数据
+          new:{page:0,list:[]}, //新款数据
+          sell:{page:0,list:[]} //精选数据
+        },
+        currentType:'pop', //用于保存当前选中项
+        isTabFixed:false,  //用于代替的tabControl的显示与隐藏
       }
     },
     components:{
@@ -87,29 +55,77 @@
       HomeSwiper,
       HomeRecommend,
       HomePopular,
-      TabControl
+      TabControl,
+      GoodsList,
+      BetterScroll,
     },
     created() {
-     this.getHomeMultiData()
+      //请求轮播及推荐数据
+      this.getHomeMultiData()
+      //请求所有goods中的数据
+      this.getHomeGoods('pop')
+      this.getHomeGoods('new')
+      this.getHomeGoods('sell')
     },
     methods:{
       //网络请求相关的方法
+        //封装请求轮播及推荐数据的方法
       getHomeMultiData(){
         getHomeMultidata().then(res => {
-          console.log(res);
+          // console.log(res);
           this.banners = res.data.banner.list
           this.recommend = res.data.recommend.list
         })
-      }
-
+      },
+        //封装请求goods数据的方法
+      getHomeGoods(type) {
+        const page = this.goods[type].page + 1
+        getHomeGoods(type, page).then(res => {
+          // console.log(res);
+          this.goods[type].list.push(...res.data.list)
+          this.goods[type].page += 1
+          this.$refs.scroll.finishpullup()
+        }).catch(err => {
+          this.$refs.scroll.finishpullup()
+        })
+      },
       //常规事件处理的方法
+        //tabControl的点击执行事件
+      tabClick(index){
+        switch (index) {
+          case 0 : this.currentType = "pop"
+            break
+          case 1 : this.currentType = 'new'
+            break
+          case 2 : this.currentType = 'sell'
+        }
+        this.$refs.tabFixed.currentIndex = index
+        this.$refs.tabContent.currentIndex = index
+    },
+        //goods图片完全加载事件
+      imageLoad(){
+        this.$refs.scroll.bs.refresh()
+      },
+        // home页的滚动监听事件
+      homeScroll(position){
+        // console.log(position);
+        this.isTabFixed = position.y < -651
+        this.getBackTopShow(position)
+      },
 
-
+        // 上拉加载更多事件
+      loadMore(){
+        this.getHomeGoods(this.currentType)
+      }
     }
   }
+
 </script>
 
 <style scoped>
+  #home{
+    height:100vh;
+  }
   .nav-bar{
     background: hotpink;
     color: #fff;
@@ -117,7 +133,14 @@
     font-weight: bold;
   }
   .tab-control{
-    position: sticky;
-    top: 44px;
+    /*position: sticky;*/
+    /*top: 44px;*/
+    /*z-index: 10;*/
+  }
+  .better-scroll1{
+    height: calc(100% - 94px);
+    overflow: hidden;
   }
 </style>
+
+
